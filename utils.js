@@ -1,8 +1,9 @@
 const { initInstance, getEnv } = require('./qlApi.js')
 const axios = require('axios')
 
-const loginURL = 'https://ikuuu.one/auth/login'
-const infoURL = 'https://ikuuu.one/user'
+const host = 'https://ikuuu.org'
+const loginURL = host + '/auth/login'
+const infoURL = host + '/user'
 const todayTrafficReg = /今日已用\n.*\s(\d+\.?\d*)([M|G|K]?B)/
 const restTrafficReg = /剩余流量[\s\S]*<span class="counter">(\d+\.?\d*)<\/span> ([M|G|K]?B)/
 
@@ -81,6 +82,32 @@ async function getCookie(email, pwd) {
     return msg
   }
 }
+function SlowerDecodeBase64(str) {
+    // Going backwards: from bytestream, to percent-encoding, to original string.
+    return decodeURIComponent(atob(str).split("").map(function(c) {
+        return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(""));
+}
+// modern browsers use TextDecoder faster
+function FasterDecodeBase64(base64) {
+    const text = atob(base64);
+    const length = text.length;
+    const bytes = new Uint8Array(length);
+    let i = 0;
+    for (i = 0; i < length; i++) {
+        bytes[i] = text.charCodeAt(i);
+    }
+    const decoder = new TextDecoder();
+    // default is utf-8
+    return decoder.decode(bytes);
+}
+function decodeBase64(str) {
+    try {
+        return FasterDecodeBase64(str);
+    } catch (e) {
+        return SlowerDecodeBase64(str);
+    }
+}
 
 /** 获取流量 */
 async function getTraffic(cookie) {
@@ -92,9 +119,18 @@ async function getTraffic(cookie) {
       },
       withCredentials: true
     })
-
-    const trafficRes = data.match(todayTrafficReg)
-    const restRes = data.match(restTrafficReg)
+    const originBodyMatch = data.match(/var originBody = "([^"]+)"/);
+    let decodeData = ''
+    if (originBodyMatch && originBodyMatch[1]) {
+        const originBody = originBodyMatch[1];
+        // 解码 Base64
+        decodeData = decodeBase64(originBody);
+    } else {
+        console.log("未找到原始HTML");
+        return;
+    }
+    const trafficRes = decodeData.match(todayTrafficReg)
+    const restRes = decodeData.match(restTrafficReg)
     if (!trafficRes || !restRes) {
       return ['查询流量失败，请检查正则和用户页面 HTML 结构']
     }
