@@ -42,7 +42,7 @@ async function run() {
     messages.push(msg)
   }
 
-  await notify.sendNotify(`iKuuu VPN 签到通知`, messages.join('\n\n========================\n\n'))
+  await notify.sendNotify(`iKuuu 签到通知`, messages.join('\n\n========================\n\n'))
 }
 
 run()
